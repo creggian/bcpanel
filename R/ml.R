@@ -73,7 +73,7 @@ auc <- function(classifiers, labels=NULL) {
 #'                          iii) 'truth': vector of true results
 #'                          
 #' @export plot.roc
-plot.roc <- function(classifiers, main="", type="b", labels=NULL, ...) {
+plot.roc <- function(classifiers, main="", type="l", labels=NULL, ...) {
   if (!require("ROCR"))
     stop("'auc' function requires 'ROCR' package")
   
