@@ -73,7 +73,7 @@ auc <- function(classifiers, labels=NULL) {
 #'                          iii) 'truth': vector of true results
 #'                          
 #' @export plot.roc
-plot.roc <- function(classifiers, main="", labels=NULL, ...) {
+plot.roc <- function(classifiers, main="", type="b", labels=NULL, ...) {
   if (!require("ROCR"))
     stop("'auc' function requires 'ROCR' package")
   
@@ -93,9 +93,9 @@ plot.roc <- function(classifiers, main="", labels=NULL, ...) {
     perf <- performance(pred, "tpr", "fpr")
     
     if (i > 1) {
-      plot(perf, col=palette[i], add=TRUE, type="b")
+      plot(perf, col=palette[i], add=TRUE, type=type)
     } else {
-      plot(perf, col=palette[i], main=main, type="b")
+      plot(perf, col=palette[i], main=main, type=type)
     }
   }
   legend("bottomright", legend=labels, pch=15, col=palette, horiz=FALSE, ...)
