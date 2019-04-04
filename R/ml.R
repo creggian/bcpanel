@@ -78,7 +78,13 @@ plot.roc <- function(classifiers, main="", labels=NULL, ...) {
     stop("'auc' function requires 'ROCR' package")
   
   if (is.null(labels)) {
-    labels <- sapply(classifiers, function(x) {x$label})
+    model_names <- sapply(classifiers, function(x) {x$label})
+    aucs_t <- t(auc(classifiers))
+    aucs <- setNames(as.vector(aucs_t), colnames(aucs_t))
+    
+    labels <- sapply(names(model_names), function(m) {
+      paste(as.vector(model_names[m]), " (auc=", round(as.vector(aucs[m]), 3), ")", sep="")
+    })
   }
   
   palette <- rainbow(length(classifiers))
