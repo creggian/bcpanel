@@ -52,6 +52,28 @@ cv <- function(x, y, nfolds=10, folds=NULL, model_callback, predict_callback, fs
   cvs
 }
 
+#' Table performance
+#' 
+#' @export
+table.performance <- function(classifiers, measure, labels=NULL) {
+  if (!require("ROCR"))
+    stop("'table.performance' function requires 'ROCR' package")
+  
+  if (is.null(labels)) {
+    labels <- sapply(classifiers, function(x) {x$label})
+  }
+  
+  m <- sapply(classifiers, function(x) {
+    pred <- prediction(x$predictions, x$truth)
+    perf <- performance(pred, measure=measure)
+    max(perf@y.values[[1]])
+  })
+  m.df <- data.frame(m=m)
+  colnames(m.df) <- measure
+  rownames(m.df) <- labels
+  m.df
+}
+
 #' it returns a dataframe with auc performances
 #'
 #' @param   classifiers     a list, where each element contains three information
@@ -61,34 +83,34 @@ cv <- function(x, y, nfolds=10, folds=NULL, model_callback, predict_callback, fs
 #'
 #' @export auc
 auc <- function(classifiers, labels=NULL) {
-  if (!require("ROCR"))
-    stop("'auc' function requires 'ROCR' package")
-  
-  if (is.null(labels)) {
-    labels <- sapply(classifiers, function(x) {x$label})
-  }
-  
-  auc <- sapply(classifiers, function(x) {
-    pred <- prediction(x$predictions, x$truth)
-    perf <- performance(pred, "auc")
-    perf@y.values[[1]]
-  })
-  auc.df <- data.frame(auc=auc)
-  rownames(auc.df) <- labels
-  auc.df
+  table.performance(classifiers, measure="auc", labels=labels)
 }
 
-#' it plot ROC curves
+#' it plots ROC curves
 #'
-#' @param   classifiers     a list, where each element contains three information
-#'                          i) 'label': string representing the classifier used
-#'                          ii) 'predictions': vector of numerical prediction
-#'                          iii) 'truth': vector of true results
+#' @param x.measure 'cutoff'
+#' @param classifiers     a list, where each element contains three information
+#'                        i) 'label': string representing the classifier used
+#'                        ii) 'predictions': vector of numerical prediction
+#'                        iii) 'truth': vector of true results
 #'                          
 #' @export plot.roc
-plot.roc <- function(classifiers, main="", type="l", labels=NULL, ...) {
+plot.roc <- function(classifiers, ...) {
+  plot.performance(classifiers, measure="tpr", x.measure="fpr", ...)
+}
+
+#' Plotting performance
+#'
+#' @param x.measure default 'cutoff'
+#' @param classifiers     a list, where each element contains three information
+#'                        i) 'label': string representing the classifier used
+#'                        ii) 'predictions': vector of numerical prediction
+#'                        iii) 'truth': vector of true results
+#'                          
+#' @export plot.performance
+plot.performance <- function(classifiers, measure, x.measure="cutoff", main="", type="l", labels=NULL, ...) {
   if (!require("ROCR"))
-    stop("'auc' function requires 'ROCR' package")
+    stop("'plot.performance' function requires 'ROCR' package")
   
   if (is.null(labels)) {
     model_names <- sapply(classifiers, function(x) {x$label})
@@ -103,7 +125,7 @@ plot.roc <- function(classifiers, main="", type="l", labels=NULL, ...) {
   palette <- rainbow(length(classifiers))
   for(i in 1:length(classifiers)) {
     pred <- prediction(classifiers[[i]]$predictions, classifiers[[i]]$truth)
-    perf <- performance(pred, "tpr", "fpr")
+    perf <- performance(prediction.obj=pred, measure=measure, x.measure=x.measure)
     
     if (i > 1) {
       plot(perf, col=palette[i], add=TRUE, type=type)
