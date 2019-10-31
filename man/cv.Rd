@@ -4,11 +4,13 @@
 \alias{cv}
 \title{Cross validation function}
 \usage{
-cv(df, fmla, nfolds = 10, folds = NULL, model_callback, predict_callback,
+cv(x, y, nfolds = 10, folds = NULL, model_callback, predict_callback,
   fs_callback = NULL, ncores = 1)
 }
 \arguments{
-\item{df}{dataset}
+\item{x}{a data.frame or matrix of predictors}
+
+\item{y}{response vector}
 
 \item{nfolds}{number of folds in cv, set k=nrow(df) to have loo}
 
@@ -17,8 +19,6 @@ cv(df, fmla, nfolds = 10, folds = NULL, model_callback, predict_callback,
 \item{fs_callback}{number of new (training) dataset sampled with replacement from 'training'}
 
 \item{ncores}{if ncores > 1 then it works in parallel}
-
-\item{mla}{a formula object correlating dependent and independent variable}
 }
 \value{
 list a (nested) list of ROCR prediction objects

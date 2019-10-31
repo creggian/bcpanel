@@ -4,9 +4,10 @@
 \alias{bcp}
 \title{bcp}
 \usage{
-bcp(df, fmla, folds = NULL, nfolds = 10, panel = c("rpart", "rf", "nnet",
+bcp(x, y, folds = NULL, nfolds = 10, panel = c("rpart", "rf", "nnet",
   "lda", "glm", "nb", "svm"), fs = NULL, opt = NULL, ...,
-  save.models = TRUE, save.formulas = TRUE, ncores = 1)
+  save.models = TRUE, save.formulas = TRUE, ncores = 1,
+  class.colname = 1)
 }
 \arguments{
 \item{nfolds}{if 'k.cv' is not null, then 'nfolds' is not used}

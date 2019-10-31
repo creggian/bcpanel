@@ -22,15 +22,28 @@ cv <- function(x, y, nfolds=10, folds=NULL, model_callback, predict_callback, fs
   }
   
   cvs <- mclapply(folds, function(idx) {
-    testing_data <- x[idx,]
-    testing_label <- y[idx]
-    training_data <- x[-idx,]
-    training_label <- y[-idx]
-    
-    if (!is.null(fs_callback)) {
-      fs <- fs_callback(xtrain=training_data, ytrain=training_label)
-      training_data <- fs$xtrain
-      training_label <- fs$ytrain
+    if (length(folds) > 1) {
+      # if we have more than one fold, then we perform
+      # cross validation as expected.
+      testing_data <- x[idx,]
+      testing_label <- y[idx]
+      training_data <- x[-idx,]
+      training_label <- y[-idx]
+      
+      if (!is.null(fs_callback)) {
+        fs <- fs_callback(xtrain=training_data, ytrain=training_label)
+        training_data <- fs$xtrain
+        training_label <- fs$ytrain
+      }
+    } else {
+      # if we have only one fold, that means that we
+      # want to build the model using the whole dataset;
+      # in this case the prediction will be on the training
+      # dataset.
+      testing_data <- x[idx,]
+      testing_label <- y[idx]
+      training_data <- testing_data
+      training_label <- testing_label
     }
     model <- model_callback(xtrain=training_data, ytrain=training_label)
     pred <- predict_callback(model, xtest=testing_data, ytest=testing_label)
