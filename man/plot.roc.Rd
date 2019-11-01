@@ -4,7 +4,7 @@
 \alias{plot.roc}
 \title{it plots ROC curves}
 \usage{
-\method{plot}{roc}(classifiers, ...)
+plot.roc(classifiers, ...)
 }
 \arguments{
 \item{classifiers}{a list, where each element contains three information

@@ -4,7 +4,8 @@
 \alias{table.performance}
 \title{Table performance}
 \usage{
-table.performance(classifiers, measure, labels = NULL)
+table.performance(classifiers, measure, return_x_measure = FALSE,
+  set_x = NULL, set_x_inequality = ">=", labels = NULL)
 }
 \description{
 Table performance

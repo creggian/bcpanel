@@ -55,7 +55,7 @@ cv <- function(x, y, nfolds=10, folds=NULL, model_callback, predict_callback, fs
 #' Table performance
 #' 
 #' @export
-table.performance <- function(classifiers, measure, labels=NULL) {
+table.performance <- function(classifiers, measure, return_x_measure=FALSE, set_x=NULL, set_x_inequality=">=", labels=NULL) {
   if (!require("ROCR"))
     stop("'table.performance' function requires 'ROCR' package")
   
@@ -66,11 +66,32 @@ table.performance <- function(classifiers, measure, labels=NULL) {
   m <- sapply(classifiers, function(x) {
     pred <- prediction(x$predictions, x$truth)
     perf <- performance(pred, measure=measure)
-    max(perf@y.values[[1]])
+    x.values <- perf@x.values
+    if (length(x.values) > 0) {
+      x.values <- x.values[[1]]
+    }
+    y.values <- perf@y.values[[1]]
+    
+    ret <- NA
+    if (is.numeric(set_x)) {
+      if (is.numeric(x.values)) {
+        if (set_x_inequality == ">=") {
+          pos <- max(which(x.values >= set_x))
+        } else {
+          pos <- min(which(x.values <= set_x))
+        }
+        ret <- y.values[pos]
+      }
+    } else {
+      ret <- max(y.values)
+      if (return_x_measure) {
+        ret <- x.values[which.max(y.values)]
+      }
+    }
+    ret
   })
-  m.df <- data.frame(m=m)
-  colnames(m.df) <- measure
-  rownames(m.df) <- labels
+  m.df <- data.frame(t(m))
+  colnames(m.df) <- labels
   m.df
 }
 
@@ -114,12 +135,18 @@ plot.performance <- function(classifiers, measure, x.measure="cutoff", main="", 
   
   if (is.null(labels)) {
     model_names <- sapply(classifiers, function(x) {x$label})
-    aucs_t <- t(auc(classifiers))
-    aucs <- setNames(as.vector(aucs_t), colnames(aucs_t))
+    labels <- model_names
     
-    labels <- sapply(names(model_names), function(m) {
-      paste(as.vector(model_names[m]), " (auc=", round(as.vector(aucs[m]), 3), ")", sep="")
-    })
+    if (measure == "tpr" & x.measure == "fpr") {
+      # if roc is demanded, then we provide in the label
+      # also the auc value
+      aucs_t <- auc(classifiers)
+      aucs <- setNames(as.vector(aucs_t), colnames(aucs_t))
+      
+      labels <- sapply(names(model_names), function(m) {
+        paste(as.vector(model_names[m]), " (auc=", round(as.vector(aucs[m]), 3), ")", sep="")
+      })
+    }
   }
   
   palette <- rainbow(length(classifiers))
