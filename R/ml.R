@@ -1,477 +1,355 @@
-#' Cross validation function
+#' glm model callback
 #'
-#' @param x a data.frame or matrix of predictors
-#' @param y response vector
-#' @param nfolds number of folds in cv, set k=nrow(df) to have loo
-#' @param folds list created with caret::createFolds function
-#' @param model_callback
-#' @param predict_callback
-#' @param fs_callback number of new (training) dataset sampled with replacement from 'training'
-#' @param ncores if ncores > 1 then it works in parallel
-#'
-#' @return list a (nested) list of ROCR prediction objects
-#' 
-#' @export cv
-cv <- function(x, y, nfolds=10, folds=NULL, model_callback, predict_callback, fs_callback=NULL, ncores=1) {
-  if (is.null(folds)) {
-    if (!require("caret"))
-      stop("'cv' function requires 'caret' package")
-    
-    folds <- createFolds(y, k=nfolds, list=TRUE, returnTrain=FALSE)
-    names(folds) <- NULL
+#' @export
+glm_model <- function(xtrain, ytrain, opts) {
+  if (!require("stats")) {
+    stop("'glm_model' function requires 'stats' package")
   }
   
-  cvs <- mclapply(folds, function(idx) {
-    if (length(folds) > 1) {
-      # if we have more than one fold, then we perform
-      # cross validation as expected.
-      testing_data <- x[idx,]
-      testing_label <- y[idx]
-      training_data <- x[-idx,]
-      training_label <- y[-idx]
-      
-      if (!is.null(fs_callback)) {
-        fs <- fs_callback(xtrain=training_data, ytrain=training_label)
-        training_data <- fs$xtrain
-        training_label <- fs$ytrain
-      }
-    } else {
-      # if we have only one fold, that means that we
-      # want to build the model using the whole dataset;
-      # in this case the prediction will be on the training
-      # dataset.
-      testing_data <- x[idx,]
-      testing_label <- y[idx]
-      training_data <- testing_data
-      training_label <- testing_label
-    }
-    model <- model_callback(xtrain=training_data, ytrain=training_label)
-    pred <- predict_callback(model, xtest=testing_data, ytest=testing_label)
-    list(model=model, pred=pred)
-  }, mc.cores=ncores)
-  cvs
+  ytrain <- as.numeric(as.character(ytrain))
+  data <- cbind(ytrain, xtrain)
+  colnames(data) <- c("Class", colnames(xtrain))
+  fmla <- as.formula("Class~.")
+  f <- get("glm", asNamespace("stats"))
+  do.call(f, c(list(formula=fmla, data=data), opts))
 }
 
-#' Table performance
+#' glm predict callback
+#'
+#' @export
+glm_predict <- function(model, xtest, ytest, opts) {
+  if (!require("stats")) {
+    stop("'glm_predict' function requires 'stats' package")
+  }
+  
+  if (!require("ROCR")) {
+    stop("'glm_predict' function requires 'ROCR' package")
+  }
+  
+  ytest <- as.numeric(as.character(ytest))
+  f <- get("predict", asNamespace("stats"))
+  prob <- do.call(f, c(list(object=model, newdata=xtest), opts))
+  ROCR::prediction(as.vector(prob), ytest)
+}
+
+#' rf model callback
 #' 
 #' @export
-table.performance <- function(classifiers, measure, return_x_measure=FALSE, set_x=NULL, set_x_inequality=">=", labels=NULL) {
-  if (!require("ROCR"))
-    stop("'table.performance' function requires 'ROCR' package")
-  
-  if (is.null(labels)) {
-    labels <- sapply(classifiers, function(x) {x$label})
+rf_model <- function(xtrain, ytrain, opts) {
+  if (!require("randomForest")) {
+    stop("'rf_model' function requires 'randomForest' package")
   }
   
-  m <- sapply(classifiers, function(x) {
-    pred <- prediction(x$predictions, x$truth)
-    perf <- performance(pred, measure=measure)
-    x.values <- perf@x.values
-    if (length(x.values) > 0) {
-      x.values <- x.values[[1]]
-    }
-    y.values <- perf@y.values[[1]]
-    
-    ret <- NA
-    if (is.numeric(set_x)) {
-      if (is.numeric(x.values)) {
-        if (set_x_inequality == ">=") {
-          pos <- max(which(x.values >= set_x))
-        } else {
-          pos <- min(which(x.values <= set_x))
-        }
-        ret <- y.values[pos]
-      }
-    } else {
-      ret <- max(y.values)
-      if (return_x_measure) {
-        ret <- x.values[which.max(y.values)]
-      }
-    }
-    ret
-  })
-  m.df <- data.frame(t(m))
-  colnames(m.df) <- labels
-  m.df
+  do.call("randomForest", c(list(xtrain, ytrain), opts))
 }
 
-#' it returns a dataframe with auc performances
-#'
-#' @param   classifiers     a list, where each element contains three information
-#'                          i) 'label': string representing the classifier used
-#'                          ii) 'predictions': vector of numerical prediction
-#'                          iii) 'truth': vector of true results
-#'
-#' @export auc
-auc <- function(classifiers, labels=NULL) {
-  table.performance(classifiers, measure="auc", labels=labels)
-}
-
-#' it plots ROC curves
-#'
-#' @param x.measure 'cutoff'
-#' @param classifiers     a list, where each element contains three information
-#'                        i) 'label': string representing the classifier used
-#'                        ii) 'predictions': vector of numerical prediction
-#'                        iii) 'truth': vector of true results
-#'                          
-#' @export plot.roc
-plot.roc <- function(classifiers, ...) {
-  plot.performance(classifiers, measure="tpr", x.measure="fpr", ...)
-}
-
-#' Plotting performance
-#'
-#' @param x.measure default 'cutoff'
-#' @param classifiers     a list, where each element contains three information
-#'                        i) 'label': string representing the classifier used
-#'                        ii) 'predictions': vector of numerical prediction
-#'                        iii) 'truth': vector of true results
-#'                          
-#' @export plot.performance
-plot.performance <- function(classifiers, measure, x.measure="cutoff", main="", type="l", labels=NULL, ...) {
-  if (!require("ROCR"))
-    stop("'plot.performance' function requires 'ROCR' package")
-  
-  if (is.null(labels)) {
-    model_names <- sapply(classifiers, function(x) {x$label})
-    labels <- model_names
-    
-    if (measure == "tpr" & x.measure == "fpr") {
-      # if roc is demanded, then we provide in the label
-      # also the auc value
-      aucs_t <- auc(classifiers)
-      aucs <- setNames(as.vector(aucs_t), colnames(aucs_t))
-      
-      labels <- sapply(names(model_names), function(m) {
-        paste(as.vector(model_names[m]), " (auc=", round(as.vector(aucs[m]), 3), ")", sep="")
-      })
-    }
-  }
-  
-  palette <- rainbow(length(classifiers))
-  for(i in 1:length(classifiers)) {
-    pred <- prediction(classifiers[[i]]$predictions, classifiers[[i]]$truth)
-    perf <- performance(prediction.obj=pred, measure=measure, x.measure=x.measure)
-    
-    if (i > 1) {
-      plot(perf, col=palette[i], add=TRUE, type=type)
-    } else {
-      plot(perf, col=palette[i], main=main, type=type)
-    }
-  }
-  legend("bottomright", legend=labels, pch=15, col=palette, horiz=FALSE, ...)
-}
-
-#' bcp
+#' rf predict callback
 #' 
-#' https://www.r-bloggers.com/a-brief-tour-of-the-trees-and-forests/ for description of decision trees
-#' 
-#' @param nfolds if 'k.cv' is not null, then 'nfolds' is not used
-#'
-#' @export bcp
-bcp <- function(x, y, folds=NULL, nfolds=10,
-                panel=c("rpart", "rf", "nnet", "lda", "glm", "nb", "svm"),
-                fs=NULL, opt=NULL, ..., save.models=TRUE, save.formulas=TRUE,
-                ncores=1, class.colname=1) {
-  if (!require("ROCR"))
-    stop("bcp function requires 'ROCR' package")
-  
-  if (is.null(folds)) {
-    if (!require("caret"))
-      stop("bcp function requires 'caret' package")
-    
-    folds <- createFolds(y, k=nfolds, list=TRUE, returnTrain=FALSE)
-    names(folds) <- NULL
+#' @export
+rf_predict <- function(model, xtest, ytest, opts) {
+  if (!require("randomForest")) {
+    stop("'rf_predict' function requires 'randomForest' package")
   }
   
-  classifiers <- list()
-  
-  if ("ctree" %in% panel) {
-    if (!require("party"))
-      stop("'ctree' classifier requires 'party' package")
-    
-    # decision tree
-    classif <- cv(df, fmla, folds=folds,
-                  model_callback=function(fmla, data, class) {
-                    do.call("ctree", c(list(formula=fmla, data=data), opt$ctree))
-                  },
-                  predict_callback=function(model, newdata, class) {
-                    prob <- do.call("rbind", predict(model, newdata=newdata, type="prob"))
-                    prediction(prob[,2], newdata[[class]])
-                  },
-                  fs_callback=fs, ncores=ncores)
-    models <- lapply(classif, function(x) x[["model"]])
-    fmlas <- lapply(classif, function(x) x[["fmla"]])
-    predictions <- as.vector(unlist(sapply(classif, function(x) x[["pred"]]@predictions[[1]])))
-    truth <- as.vector(unlist(sapply(classif, function(x) x[["pred"]]@labels[[1]])))
-    
-    classifiers$ctree <- list(label="ctree",
-                              predictions=predictions,
-                              truth=truth,
-                              models=models,
-                              formulas=fmlas)
+  if (!require("ROCR")) {
+    stop("'rf_predict' function requires 'ROCR' package")
   }
   
-  if ("rpart" %in% panel) {
-    if (!require("rpart"))
-      stop("'rpart' classifier requires 'rpart' package")
-    
-    classif <- cv(x, y, folds=folds,
-                  model_callback=function(xtrain, ytrain) {
-                    data <- cbind(ytrain, xtrain)
-                    colnames(data) <- c("Class", colnames(xtrain))
-                    fmla <- as.formula("Class~.")
-                    do.call("rpart", c(list(formula=fmla, data=data), opt$rpart))
-                  },
-                  predict_callback=function(model, xtest, ytest) {
-                    prob <- predict(model, newdata=xtest, type="prob")
-                    prediction(prob[,which(colnames(prob) == class.colname)], ytest)
-                  },
-                  fs_callback=fs, ncores=ncores)
-    models <- lapply(classif, function(x) x[["model"]])
-    predictions <- as.vector(unlist(sapply(classif, function(x) x[["pred"]]@predictions[[1]])))
-    truth <- as.vector(unlist(sapply(classif, function(x) x[["pred"]]@labels[[1]])))
-    
-    classifiers$rpart <- list(label="rpart",
-                              predictions=predictions,
-                              truth=truth,
-                              models=models)
+  if (is.null(opts$class.colname)) {
+    stop("'rf_predict' function requires an option 'class.colname' to be defined")
   }
   
-  if ("rf" %in% panel) {
-    if (!require("randomForest"))
-      stop("'rf' classifier requires 'randomForest' package")
-    
-    classif <- cv(x, y, folds=folds,
-                  model_callback=function(xtrain, ytrain) {
-                    do.call("randomForest", c(list(xtrain, ytrain, method="rf", probability=TRUE), opt$rf))
-                  },
-                  predict_callback=function(model, xtest, ytest) {
-                    prob <- predict(model, newdata=xtest, type="prob")
-                    prediction(prob[,which(colnames(prob) == class.colname)], ytest)
-                  },
-                  fs_callback=fs, ncores=ncores)
-    models <- lapply(classif, function(x) x[["model"]])
-    predictions <- as.vector(unlist(sapply(classif, function(x) x[["pred"]]@predictions[[1]])))
-    truth <- as.vector(unlist(sapply(classif, function(x) x[["pred"]]@labels[[1]])))
-    
-    classifiers$rf <- list(label="rf",
-                           predictions=predictions,
-                           truth=truth,
-                           models=models)
-  }
-  
-  if ("xgboost" %in% panel) {
-    if (!require("xgboost"))
-      stop("'xgboost' classifier requires 'xgboost' package")
-    
-    classif <- cv(x, y, folds=folds,
-                  model_callback=function(xtrain, ytrain) {
-                    do.call("xgboost", c(list(data=xtrain, label=ytrain, objective="binary:logistic"), opt$xgboost))
-                  },
-                  predict_callback=function(model, xtest, ytest) {
-                    prob <- predict(model, newdata=xtest)
-                    prediction(prob, ytest)
-                  },
-                  fs_callback=fs, ncores=ncores)
-    models <- lapply(classif, function(x) x[["model"]])
-    predictions <- as.vector(unlist(sapply(classif, function(x) x[["pred"]]@predictions[[1]])))
-    truth <- as.vector(unlist(sapply(classif, function(x) x[["pred"]]@labels[[1]])))
-    
-    classifiers$xgboost <- list(label="xgboost",
-                                predictions=predictions,
-                                truth=truth,
-                                models=models)
-  }
-  
-  if ("gbm3" %in% panel) {
-    if (!require("gbm3"))
-      stop("'gbm3' classifier requires 'gbm3' package")
-    
-    classif <- cv(x, y, folds=folds,
-                  model_callback=function(xtrain, ytrain) {
-                    do.call("gbm.fit", c(list(x=xtrain, y=ytrain), opt$gbm3))
-                  },
-                  predict_callback=function(model, xtest, ytest) {
-                    prob <- predict(model, newdata=xtest, n.trees=100)  # HACK!
-                    prediction(prob, ytest)
-                  },
-                  fs_callback=fs, ncores=ncores)
-    models <- lapply(classif, function(x) x[["model"]])
-    predictions <- as.vector(unlist(sapply(classif, function(x) x[["pred"]]@predictions[[1]])))
-    truth <- as.vector(unlist(sapply(classif, function(x) x[["pred"]]@labels[[1]])))
-    
-    classifiers$gbm3 <- list(label="gbm3",
-                             predictions=predictions,
-                             truth=truth,
-                             models=models)
-  }
-  
-  if ("knn" %in% panel) {
-    if (!require("class"))
-      stop("'knn' classifier requires 'class' package")
-    
-    classif <- cv(x, y, folds=folds,
-                  model_callback=function(xtrain, ytrain) {
-                    list(xtrain=xtrain, ytrain=ytrain)
-                  },
-                  predict_callback=function(model, xtest, ytest) {
-                    prob <- attr(do.call("knn", c(list(train=model$xtrain, test=xtest, cl=model$ytrain, prob=TRUE), opt$knn)), "prob")
-                    prediction(prob, ytest)
-                  },
-                  fs_callback=fs, ncores=ncores)
-    models <- lapply(classif, function(x) x[["model"]])
-    predictions <- as.vector(unlist(sapply(classif, function(x) x[["pred"]]@predictions[[1]])))
-    truth <- as.vector(unlist(sapply(classif, function(x) x[["pred"]]@labels[[1]])))
-    
-    classifiers$knn <- list(label="knn",
-                            predictions=predictions,
-                            truth=truth,
-                            models=models)
-  }
-  
-  if ("lda" %in% panel) {
-    if (!require("MASS"))
-      stop("'lda' classifier requires 'MASS' package")
-    
-    # lda
-    classif <- cv(df, fmla, folds=folds,
-                  model_callback=function(fmla, data, class) {
-                    do.call("lda", c(list(formula=fmla, data=data), opt$lda))
-                  },
-                  predict_callback=function(model, newdata, class) {
-                    p <- predict(model, newdata=newdata)
-                    prob <- as.vector(p$posterior[,which(colnames(p$posterior) == class.colname)])
-                    pred <- prediction(prob, newdata[[class]])
-                  },
-                  fs_callback=fs, ncores=ncores)
-    models <- lapply(classif, function(x) x[["model"]])
-    fmlas <- lapply(classif, function(x) x[["fmla"]])
-    predictions <- as.vector(unlist(sapply(classif, function(x) x[["pred"]]@predictions[[1]])))
-    truth <- as.vector(unlist(sapply(classif, function(x) x[["pred"]]@labels[[1]])))
-    
-    classifiers$lda <- list(label="lda",
-                            predictions=predictions,
-                            truth=truth,
-                            models=models,
-                            formulas=fmlas)
-  }
-  
-  if ("nb" %in% panel) {
-    if (!require("e1071"))
-      stop("'nb' classifier requires 'e1071' package")
-    
-    # naive bayes
-    classif <- cv(df, fmla, folds=folds,
-                  model_callback=function(fmla, data, class) {
-                    do.call("naiveBayes", c(list(formula=fmla, data=data), opt$nb))
-                  },
-                  predict_callback=function(model, newdata, class) {
-                    prob <- predict(model, newdata, type="raw")
-                    pred <- prediction(prob[,which(colnames(prob) == class.colname)], newdata[[class]])
-                  },
-                  fs_callback=fs, ncores=ncores)
-    models <- lapply(classif, function(x) x[["model"]])
-    fmlas <- lapply(classif, function(x) x[["fmla"]])
-    predictions <- as.vector(unlist(sapply(classif, function(x) x[["pred"]]@predictions[[1]])))
-    truth <- as.vector(unlist(sapply(classif, function(x) x[["pred"]]@labels[[1]])))
-    
-    classifiers$nb <- list(label="nb",
-                           predictions=predictions,
-                           truth=truth,
-                           models=models,
-                           formulas=fmlas)
-  }
-  
-  if ("svm" %in% panel) {
-    if (!require("e1071"))
-      stop("'svm' classifier requires 'e1071' package")
-    
-    # svm
-    classif <- cv(x, y, folds=folds,
-                  model_callback=function(xtrain, ytrain) {
-                    do.call("svm", c(list(x=xtrain, y=ytrain, probability=TRUE), opt$svm))
-                  },
-                  predict_callback=function(model, xtest, ytest) {
-                    prob <- predict(model, newdata=xtest, probability=TRUE)
-                    p.df <- attributes(prob)$probabilities
-                    p.good <- p.df[,which(colnames(p.df) == class.colname)]
-                    prediction(as.vector(p.good), ytest)
-                  },
-                  fs_callback=fs, ncores=ncores)
-    models <- lapply(classif, function(x) x[["model"]])
-    predictions <- as.vector(unlist(sapply(classif, function(x) x[["pred"]]@predictions[[1]])))
-    truth <- as.vector(unlist(sapply(classif, function(x) x[["pred"]]@labels[[1]])))
-    
-    classifiers$svm <- list(label="svm",
-                            predictions=predictions,
-                            truth=truth,
-                            models=models)
-  }
-  
-  if ("glm" %in% panel) {
-    if (!require("stats"))
-      stop("'glm' classifier requires 'stats' package")
-    
-    # glm
-    classif <- cv(x, y, folds=folds,
-                  model_callback=function(xtrain, ytrain) {
-                    data <- cbind(ytrain, xtrain)
-                    colnames(data) <- c("Class", colnames(xtrain))
-                    fmla <- as.formula("Class~.")
-                    do.call("glm", c(list(formula=fmla, data=data), opt$glm))
-                  },
-                  predict_callback=function(model, xtest, ytest) {
-                    prob <- predict(model, newdata=xtest, type="response")
-                    prediction(as.vector(prob), ytest)
-                  },
-                  fs_callback=fs, ncores=ncores)
-    models <- lapply(classif, function(x) x[["model"]])
-    fmlas <- lapply(classif, function(x) x[["fmla"]])
-    predictions <- as.vector(unlist(sapply(classif, function(x) x[["pred"]]@predictions[[1]])))
-    truth <- as.vector(unlist(sapply(classif, function(x) x[["pred"]]@labels[[1]])))
-    
-    classifiers$glm <- list(label="glm",
-                            predictions=predictions,
-                            truth=truth,
-                            models=models,
-                            formulas=fmlas)
-  }
-  
-  if ("nnet" %in% panel) {
-    if (!require("nnet"))
-      stop("'nnet' classifier requires 'nnet' package")
-    
-    # neural network
-    classif <- cv(df, fmla, folds=folds,
-                  model_callback=function(fmla, data, class) {
-                    do.call("nnet", c(list(formula=fmla, data=data), opt$nnet))
-                  },
-                  predict_callback=function(model, newdata, class) {
-                    prob <- predict(model, newdata=newdata, type="raw")
-                    prediction(prob[,1], newdata[[class]])
-                  },
-                  fs_callback=fs, ncores=ncores)
-    models <- lapply(classif, function(x) x[["model"]])
-    fmlas <- lapply(classif, function(x) x[["fmla"]])
-    predictions <- as.vector(unlist(sapply(classif, function(x) x[["pred"]]@predictions[[1]])))
-    truth <- as.vector(unlist(sapply(classif, function(x) x[["pred"]]@labels[[1]])))
-    
-    classifiers$nnet <- list(label="nnet",
-                             predictions=predictions,
-                             truth=truth,
-                             models=models,
-                             formulas=fmlas)
-  }
-  
-  classifiers
+  prob <- do.call("predict", c(list(object=model, newdata=xtest, type="prob"), opts))
+  prediction(prob[,which(colnames(prob) == opts$class.colname)], ytest)
 }
 
-#' getFormula
+#' rpart model callback
+#' 
+#' @export
+rpart_model <- function(xtrain, ytrain, opts) {
+  if (!require("rpart")) {
+    stop("'rpart_model' function requires 'rpart' package")
+  }
+  
+  data <- cbind(ytrain, xtrain)
+  colnames(data) <- c("Class", colnames(xtrain))
+  fmla <- as.formula("Class~.")
+  do.call("rpart", c(list(formula=fmla, data=data), opts))
+}
+
+#' rpart predict callback
+#' 
+#' @export
+rpart_predict <- function(model, xtest, ytest, opts) {
+  if (!require("rpart")) {
+    stop("'rpart_predict' function requires 'rpart' package")
+  }
+  
+  if (!require("ROCR")) {
+    stop("'rpart_predict' function requires 'ROCR' package")
+  }
+  
+  if (is.null(opts$class.colname)) {
+    stop("'rpart_predict' function requires an option 'class.colname' to be defined")
+  }
+  
+  prob <- do.call("predict", c(list(object=model, newdata=xtest, type="prob"), opts))
+  prediction(prob[,which(colnames(prob) == opts$class.colname)], ytest)
+}
+
+#' ctree model callback
+#' 
+#' @export
+ctree_model <- function(xtrain, ytrain, opts) {
+  if (!require("party")) {
+    stop("'ctree_model' function requires 'party' package")
+  }
+  
+  data <- cbind(ytrain, xtrain)
+  colnames(data) <- c("Class", colnames(xtrain))
+  fmla <- as.formula("Class~.")
+  do.call("ctree", c(list(formula=fmla, data=data), opts))
+}
+
+#' ctree predict callback
+#' 
+#' @export
+ctree_predict <- function(model, xtest, ytest, opts) {
+  if (!require("party")) {
+    stop("'ctree_predict' function requires 'party' package")
+  }
+  
+  if (!require("ROCR")) {
+    stop("'ctree_predict' function requires 'ROCR' package")
+  }
+  
+  res <- do.call("predict", c(list(object=model, newdata=xtest, type="prob"), opts))
+  prob <- do.call("rbind", res)
+  prediction(prob[,2], ytest)
+}
+
+#' xgboost model callback
+#' 
+#' @export
+xgboost_model <- function(xtrain, ytrain, opts) {
+  if (!require("xgboost"))
+    stop("'xgboost_model' function requires 'xgboost' package")
+  
+  xtrain <- as.matrix(xtrain)
+  ytrain <- as.numeric(as.character(ytrain))
+  do.call("xgboost", c(list(data=xtrain, label=ytrain, objective="binary:logistic"), opts))
+}
+
+#' xgboost predict callback
+#' 
+#' @export
+xgboost_predict <- function(model, xtest, ytest, opts) {
+  if (!require("xgboost")) {
+    stop("'xgboost_predict' function requires 'xgboost' package")
+  }
+  
+  if (!require("ROCR")) {
+    stop("'xgboost_predict' function requires 'ROCR' package")
+  }
+  
+  xtest <- as.matrix(xtest)
+  ytest <- as.numeric(as.character(ytest))
+  prob <- do.call("predict", c(list(object=model, newdata=xtest), opts))
+  prediction(prob, ytest)
+}
+
+#' gbm3 model callback
 #'
-#' @export getFormula
-getFormula <- function(col.names, class.idx=1) {
-  class.name <- col.names[class.idx]
-  as.formula(paste(class.name, " ~ ", paste(col.names[-class.idx], collapse=" + ")))
+#' @export
+gbm3_model <- function(xtrain, ytrain, opts) {
+  if (!require("gbm3")) {
+    stop("'gbm3_model' function requires 'gbm3' package")
+  }
+  
+  f <- get("gbm.fit", asNamespace("gbm3"))
+  do.call(f, c(list(x=xtrain, y=ytrain), opts))
+}
+
+#' gbm3 predict callback
+#'
+#' @export
+gbm3_predict <- function(model, xtest, ytest, opts) {
+  if (!require("gbm3")) {
+    stop("'gbm3_predict' function requires 'gbm3' package")
+  }
+  
+  if (!require("ROCR")) {
+    stop("'glm_predict' function requires 'ROCR' package")
+  }
+  
+  f <- get("predict", asNamespace("gbm3"))
+  prob <- do.call(f, c(list(object=model, newdata=xtest), opts))
+  ROCR::prediction(prob, ytest)
+}
+
+#' knn model callback
+#'
+#' @export
+knn_model <- function(xtrain, ytrain, opts) {
+  if (!require("class")) {
+    stop("'knn_model' function requires 'class' package")
+  }
+  
+  list(xtrain=xtrain, ytrain=ytrain)
+}
+
+#' knn predict callback
+#'
+#' @export
+knn_predict <- function(model, xtest, ytest, opts) {
+  if (!require("class")) {
+    stop("'knn_predict' function requires 'class' package")
+  }
+  
+  if (!require("ROCR")) {
+    stop("'glm_predict' function requires 'ROCR' package")
+  }
+  
+  f <- get("knn", asNamespace("class"))
+  prob <- attr(do.call(f, c(list(train=model$xtrain, test=xtest, cl=model$ytrain, prob=TRUE), opts)), "prob")
+  ROCR::prediction(prob, ytest)
+}
+
+#' lda model callback
+#'
+#' @export
+lda_model <- function(xtrain, ytrain, opts) {
+  if (!require("MASS")) {
+    stop("'lda_model' function requires 'MASS' package")
+  }
+  
+  data <- cbind(ytrain, xtrain)
+  colnames(data) <- c("Class", colnames(xtrain))
+  fmla <- as.formula("Class~.")
+  f <- get("lda", asNamespace("MASS"))
+  do.call(f, c(list(formula=fmla, data=data), opts))
+}
+
+#' lda predict callback
+#'
+#' @export
+lda_predict <- function(model, xtest, ytest, opts) {
+  if (!require("MASS")) {
+    stop("'lda_predict' function requires 'MASS' package")
+  }
+  
+  if (!require("ROCR")) {
+    stop("'lda_predict' function requires 'ROCR' package")
+  }
+  
+  if (is.null(opts$class.colname)) {
+    stop("'lda_predict' function requires an option 'class.colname' to be defined")
+  }
+  
+  f <- get("predict", asNamespace("MASS"))
+  p <- do.call(f, c(list(object=model, newdata=xtest), opts))
+  prob <- as.vector(p$posterior[,which(colnames(p$posterior) == opts$class.colname)])
+  ROCR::prediction(prob, ytest)
+}
+
+#' nb model callback
+#'
+#' @export
+nb_model <- function(xtrain, ytrain, opts) {
+  if (!require("e1071")) {
+    stop("'nb_model' function requires 'e1071' package")
+  }
+  
+  data <- cbind(ytrain, xtrain)
+  colnames(data) <- c("Class", colnames(xtrain))
+  fmla <- as.formula("Class~.")
+  f <- get("naiveBayes", asNamespace("e1071"))
+  do.call(f, c(list(formula=fmla, data=data), opts))
+}
+
+#' nb predict callback
+#'
+#' @export
+nb_predict <- function(model, xtest, ytest, opts) {
+  if (!require("e1071")) {
+    stop("'nb_predict' function requires 'e1071' package")
+  }
+  
+  if (!require("ROCR")) {
+    stop("'nb_predict' function requires 'ROCR' package")
+  }
+  
+  if (is.null(opts$class.colname)) {
+    stop("'nb_predict' function requires an option 'class.colname' to be defined")
+  }
+  
+  f <- get("predict", asNamespace("e1071"))
+  prob <- do.call(f, c(list(object=model, newdata=xtest), opts))
+  ROCR::prediction(prob[,which(colnames(prob) == opts$class.colname)], ytest)
+}
+
+#' svm model callback
+#'
+#' @export
+svm_model <- function(xtrain, ytrain, opts) {
+  if (!require("e1071")) {
+    stop("'svm_model' function requires 'e1071' package")
+  }
+  
+  f <- get("svm", asNamespace("e1071"))
+  do.call(f, c(list(x=xtrain, y=ytrain), opts))
+}
+
+#' svm predict callback
+#'
+#' @export
+svm_predict <- function(model, xtest, ytest, opts) {
+  if (!require("e1071")) {
+    stop("'svm_predict' function requires 'e1071' package")
+  }
+  
+  if (!require("ROCR")) {
+    stop("'svm_predict' function requires 'ROCR' package")
+  }
+  
+  if (is.null(opts$class.colname)) {
+    stop("'svm_predict' function requires an option 'class.colname' to be defined")
+  }
+  
+  f <- get("predict", asNamespace("e1071"))
+  prob <- do.call(f, c(list(object=model, newdata=xtest), opts))
+  p.df <- attributes(prob)$probabilities
+  p.good <- p.df[,which(colnames(p.df) == opts$class.colname)]
+  ROCR::prediction(as.vector(p.good), ytest)
+}
+#' nnet model callback
+#'
+#' @export
+nnet_model <- function(xtrain, ytrain, opts) {
+  if (!require("nnet")) {
+    stop("'nnet_model' function requires 'nnet' package")
+  }
+  
+  data <- cbind(ytrain, xtrain)
+  colnames(data) <- c("Class", colnames(xtrain))
+  fmla <- as.formula("Class~.")
+  f <- get("nnet", asNamespace("nnet"))
+  do.call(f, c(list(formula=fmla, data=data), opts))
+}
+
+#' nnet predict callback
+#'
+#' @export
+nnet_predict <- function(model, xtest, ytest, opts) {
+  if (!require("nnet")) {
+    stop("'nnet_predict' function requires 'nnet' package")
+  }
+  
+  if (!require("ROCR")) {
+    stop("'nnet_predict' function requires 'ROCR' package")
+  }
+  
+  f <- get("predict", asNamespace("nnet"))
+  prob <- do.call(f, c(list(object=model, newdata=xtest), opts))
+  ROCR::prediction(prob[,1], ytest)
 }
