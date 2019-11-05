@@ -211,8 +211,14 @@ knn_predict <- function(model, xtest, ytest, opts) {
   }
   
   f <- get("knn", asNamespace("class"))
-  prob <- attr(do.call(f, c(list(train=model$xtrain, test=xtest, cl=model$ytrain), opts)), "prob")
-  ROCR::prediction(prob, ytest)
+  res <- do.call(f, c(list(train=model$xtrain, test=xtest, cl=model$ytrain), opts))
+  if (isTRUE(opts$prob)) {
+    res <- attr(res, "prob")
+  } else {
+    res <- as.charnum(res)
+  }
+  
+  ROCR::prediction(res, ytest)
 }
 
 #' lda model callback
