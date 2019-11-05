@@ -59,7 +59,7 @@ rf_predict <- function(model, xtest, ytest, opts) {
     stop("'rf_predict' function requires an option 'class.colname' to be defined")
   }
   
-  prob <- do.call("predict", c(list(object=model, newdata=xtest, type="prob"), opts))
+  prob <- do.call("predict", c(list(object=model, newdata=xtest), opts))
   prediction(prob[,which(colnames(prob) == opts$class.colname)], ytest)
 }
 
@@ -93,7 +93,7 @@ rpart_predict <- function(model, xtest, ytest, opts) {
     stop("'rpart_predict' function requires an option 'class.colname' to be defined")
   }
   
-  prob <- do.call("predict", c(list(object=model, newdata=xtest, type="prob"), opts))
+  prob <- do.call("predict", c(list(object=model, newdata=xtest), opts))
   prediction(prob[,which(colnames(prob) == opts$class.colname)], ytest)
 }
 
@@ -123,7 +123,7 @@ ctree_predict <- function(model, xtest, ytest, opts) {
     stop("'ctree_predict' function requires 'ROCR' package")
   }
   
-  res <- do.call("predict", c(list(object=model, newdata=xtest, type="prob"), opts))
+  res <- do.call("predict", c(list(object=model, newdata=xtest), opts))
   prob <- do.call("rbind", res)
   prediction(prob[,2], ytest)
 }
@@ -137,7 +137,7 @@ xgboost_model <- function(xtrain, ytrain, opts) {
   
   xtrain <- as.matrix(xtrain)
   ytrain <- as.numeric(as.character(ytrain))
-  do.call("xgboost", c(list(data=xtrain, label=ytrain, objective="binary:logistic"), opts))
+  do.call("xgboost", c(list(data=xtrain, label=ytrain), opts))
 }
 
 #' xgboost predict callback
@@ -211,7 +211,7 @@ knn_predict <- function(model, xtest, ytest, opts) {
   }
   
   f <- get("knn", asNamespace("class"))
-  prob <- attr(do.call(f, c(list(train=model$xtrain, test=xtest, cl=model$ytrain, prob=TRUE), opts)), "prob")
+  prob <- attr(do.call(f, c(list(train=model$xtrain, test=xtest, cl=model$ytrain), opts)), "prob")
   ROCR::prediction(prob, ytest)
 }
 
