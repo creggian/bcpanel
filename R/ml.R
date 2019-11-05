@@ -215,7 +215,7 @@ knn_predict <- function(model, xtest, ytest, opts) {
   if (isTRUE(opts$prob)) {
     res <- attr(res, "prob")
   } else {
-    res <- as.charnum(res)
+    res <- as_charnum(res)
   }
   
   ROCR::prediction(res, ytest)

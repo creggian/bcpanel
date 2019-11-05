@@ -9,6 +9,6 @@ get_formula <- function(col.names, class.idx=1) {
 #' As charnum
 #'
 #' @export
-as.charnum <- function(x) {
+as_charnum <- function(x) {
   as.numeric(as.character(x))
 }
