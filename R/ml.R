@@ -40,7 +40,8 @@ rf_model <- function(xtrain, ytrain, opts) {
     stop("'rf_model' function requires 'randomForest' package")
   }
   
-  do.call("randomForest", c(list(xtrain, ytrain), opts))
+  f <- get("randomForest", asNamespace("randomForest"))
+  do.call(f, c(list(xtrain, ytrain), opts))
 }
 
 #' rf predict callback
@@ -59,8 +60,9 @@ rf_predict <- function(model, xtest, ytest, opts) {
     stop("'rf_predict' function requires an option 'class.colname' to be defined")
   }
   
-  prob <- do.call("predict", c(list(object=model, newdata=xtest), opts))
-  prediction(prob[,which(colnames(prob) == opts$class.colname)], ytest)
+  f <- get("predict", asNamespace("randomForest"))
+  prob <- do.call(f, c(list(object=model, newdata=xtest), opts))
+  ROCR::prediction(prob[,which(colnames(prob) == opts$class.colname)], ytest)
 }
 
 #' rpart model callback
@@ -74,7 +76,8 @@ rpart_model <- function(xtrain, ytrain, opts) {
   data <- cbind(ytrain, xtrain)
   colnames(data) <- c("Class", colnames(xtrain))
   fmla <- as.formula("Class~.")
-  do.call("rpart", c(list(formula=fmla, data=data), opts))
+  f <- get("rpart", asNamespace("rpart"))
+  do.call(f, c(list(formula=fmla, data=data), opts))
 }
 
 #' rpart predict callback
@@ -93,8 +96,9 @@ rpart_predict <- function(model, xtest, ytest, opts) {
     stop("'rpart_predict' function requires an option 'class.colname' to be defined")
   }
   
-  prob <- do.call("predict", c(list(object=model, newdata=xtest), opts))
-  prediction(prob[,which(colnames(prob) == opts$class.colname)], ytest)
+  f <- get("predict", asNamespace("rpart"))
+  prob <- do.call(f, c(list(object=model, newdata=xtest), opts))
+  ROCR::prediction(prob[,which(colnames(prob) == opts$class.colname)], ytest)
 }
 
 #' ctree model callback
@@ -108,7 +112,8 @@ ctree_model <- function(xtrain, ytrain, opts) {
   data <- cbind(ytrain, xtrain)
   colnames(data) <- c("Class", colnames(xtrain))
   fmla <- as.formula("Class~.")
-  do.call("ctree", c(list(formula=fmla, data=data), opts))
+  f <- get("ctree", asNamespace("party"))
+  do.call(f, c(list(formula=fmla, data=data), opts))
 }
 
 #' ctree predict callback
@@ -123,9 +128,10 @@ ctree_predict <- function(model, xtest, ytest, opts) {
     stop("'ctree_predict' function requires 'ROCR' package")
   }
   
-  res <- do.call("predict", c(list(object=model, newdata=xtest), opts))
+  f <- get("predict", asNamespace("party"))
+  res <- do.call(f, c(list(object=model, newdata=xtest), opts))
   prob <- do.call("rbind", res)
-  prediction(prob[,2], ytest)
+  ROCR::prediction(prob[,2], ytest)
 }
 
 #' xgboost model callback
@@ -137,7 +143,8 @@ xgboost_model <- function(xtrain, ytrain, opts) {
   
   xtrain <- as.matrix(xtrain)
   ytrain <- as.numeric(as.character(ytrain))
-  do.call("xgboost", c(list(data=xtrain, label=ytrain), opts))
+  f <- get("xgboost", asNamespace("xgboost"))
+  do.call(f, c(list(data=xtrain, label=ytrain), opts))
 }
 
 #' xgboost predict callback
@@ -154,8 +161,9 @@ xgboost_predict <- function(model, xtest, ytest, opts) {
   
   xtest <- as.matrix(xtest)
   ytest <- as.numeric(as.character(ytest))
-  prob <- do.call("predict", c(list(object=model, newdata=xtest), opts))
-  prediction(prob, ytest)
+  f <- get("predict", asNamespace("xgboost"))
+  prob <- do.call(f, c(list(object=model, newdata=xtest), opts))
+  ROCR::prediction(prob, ytest)
 }
 
 #' gbm3 model callback
