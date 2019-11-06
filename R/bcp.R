@@ -5,7 +5,7 @@
 #' @param nfolds if 'k.cv' is not null, then 'nfolds' is not used
 #'
 #' @export bcp
-bcp <- function(x, y, folds=NULL, nfolds=10, panel, save.models=TRUE, save.formulas=TRUE, ncores=1) {
+bcp <- function(x, y, folds=NULL, nfolds=10, panel, save_models=TRUE, ncores=1) {
   if (is.null(folds)) {
     if (!require("caret"))
       stop("bcp function requires 'caret' package to create folds")
@@ -32,12 +32,16 @@ bcp <- function(x, y, folds=NULL, nfolds=10, panel, save.models=TRUE, save.formu
     predictions <- as.vector(unlist(sapply(classif, function(x) x[["pred"]]@predictions[[1]])))
     truth <- as.vector(unlist(sapply(classif, function(x) x[["pred"]]@labels[[1]])))
     
-    list(
+    ret <- list(
       label = name,
       predictions = predictions,
-      truth = truth,
-      models = models
+      truth = truth
     )
+    if (isTRUE(save_models)) {
+      ret$models <- models
+    }
+    
+    ret
   })
   
   names(classifiers) <- names(panel)
