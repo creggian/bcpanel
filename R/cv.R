@@ -44,7 +44,7 @@ cv <- function(x, y, nfolds=10, folds=NULL, model_callback, predict_callback, fs
       training_data <- x[-idx,]
       training_label <- y[-idx]
       
-      if (!is.null(fs_callback)) {
+      if (is.function(fs_callback)) {
         fs <- fs_callback(xtrain=training_data, ytrain=training_label, opts$fs)
         training_data <- fs$xtrain
         training_label <- fs$ytrain
@@ -59,9 +59,15 @@ cv <- function(x, y, nfolds=10, folds=NULL, model_callback, predict_callback, fs
       training_data <- testing_data
       training_label <- testing_label
     }
+    
     model <- model_callback(xtrain=training_data, ytrain=training_label, opts$model)
     pred <- predict_callback(model, xtest=testing_data, ytest=testing_label, opts$predict)
-    list(model=model, pred=pred)
+    
+    list(
+      model=model,
+      pred=pred
+    )
   }, mc.cores=ncores)
+  
   cvs
 }
