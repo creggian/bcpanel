@@ -4,8 +4,17 @@
 \alias{cv}
 \title{Cross validation function}
 \usage{
-cv(x, y, nfolds = 10, folds = NULL, model_callback, predict_callback,
-  fs_callback = NULL, opts = list(), ncores = 1)
+cv(
+  x,
+  y,
+  nfolds = 10,
+  folds = NULL,
+  model_callback,
+  predict_callback,
+  fs_callback = NULL,
+  opts = list(),
+  ncores = 1
+)
 }
 \arguments{
 \item{x}{a data.frame or matrix of predictors}
@@ -15,6 +24,10 @@ cv(x, y, nfolds = 10, folds = NULL, model_callback, predict_callback,
 \item{nfolds}{number of folds in cv, set k=nrow(df) to have loo}
 
 \item{folds}{list created with caret::createFolds function}
+
+\item{model_callback}{callback for modeling}
+
+\item{predict_callback}{callback for prediction}
 
 \item{fs_callback}{number of new (training) dataset sampled with replacement from 'training'}
 

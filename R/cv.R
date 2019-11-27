@@ -4,8 +4,8 @@
 #' @param y response vector
 #' @param nfolds number of folds in cv, set k=nrow(df) to have loo
 #' @param folds list created with caret::createFolds function
-#' @param model_callback
-#' @param predict_callback
+#' @param model_callback callback for modeling
+#' @param predict_callback callback for prediction
 #' @param fs_callback number of new (training) dataset sampled with replacement from 'training'
 #' @param ncores if ncores > 1 then it works in parallel
 #'
@@ -64,8 +64,9 @@ cv <- function(x, y, nfolds=10, folds=NULL, model_callback, predict_callback, fs
     pred <- predict_callback(model, xtest=testing_data, ytest=testing_label, opts$predict)
     
     list(
-      model=model,
-      pred=pred
+      idx = idx,
+      model = model,
+      pred = pred
     )
   }, mc.cores=ncores)
   

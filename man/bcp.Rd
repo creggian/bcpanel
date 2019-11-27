@@ -4,8 +4,7 @@
 \alias{bcp}
 \title{bcp}
 \usage{
-bcp(x, y, folds = NULL, nfolds = 10, panel, save_models = TRUE,
-  ncores = 1)
+bcp(x, y, folds = NULL, nfolds = 10, panel, save_models = TRUE, ncores = 1)
 }
 \arguments{
 \item{nfolds}{if 'k.cv' is not null, then 'nfolds' is not used}

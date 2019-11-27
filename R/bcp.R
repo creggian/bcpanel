@@ -28,12 +28,16 @@ bcp <- function(x, y, folds=NULL, nfolds=10, panel, save_models=TRUE, ncores=1) 
       opts = p$opts,
       ncores = ncores
     )
+    idx <- lapply(classif, function(x) x[["idx"]])
     models <- lapply(classif, function(x) x[["model"]])
+    preds <- lapply(classif, function(x) x[["pred"]])
     predictions <- as.vector(unlist(sapply(classif, function(x) x[["pred"]]@predictions[[1]])))
     truth <- as.vector(unlist(sapply(classif, function(x) x[["pred"]]@labels[[1]])))
     
     ret <- list(
+      idx = idx,
       label = name,
+      preds = preds,
       predictions = predictions,
       truth = truth
     )
