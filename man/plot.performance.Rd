@@ -4,8 +4,8 @@
 \alias{plot.performance}
 \title{Plotting performance}
 \usage{
-plot.performance(classifiers, measure, x.measure = "cutoff", main = "",
-  type = "l", labels = NULL, ...)
+\method{plot}{performance}(classifiers, measure, x.measure = "cutoff",
+  main = "", type = "l", labels = NULL, ...)
 }
 \arguments{
 \item{classifiers}{a list, where each element contains three information
