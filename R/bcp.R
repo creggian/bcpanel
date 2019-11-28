@@ -14,9 +14,9 @@ bcp <- function(x, y, folds=NULL, nfolds=10, panel, save_models=TRUE, ncores=1) 
     names(folds) <- NULL
   }
   
-  classifiers <- lapply(seq_along(panel), function(idx) {
-    name <- names(panel)[idx]
-    p <- panel[[idx]]
+  classifiers <- lapply(seq_along(panel), function(i) {
+    name <- names(panel)[i]
+    p <- panel[[i]]
     
     classif <- cv(
       x,
