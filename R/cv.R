@@ -22,6 +22,7 @@ cv <- function(x, y, nfolds=10, folds=NULL, model_callback, predict_callback, fs
   }
   
   # init opts if not set
+  fs <- NULL
   if (!is.list(opts)) {
     opts <- list()
   }
@@ -43,12 +44,6 @@ cv <- function(x, y, nfolds=10, folds=NULL, model_callback, predict_callback, fs
       testing_label <- y[idx]
       training_data <- x[-idx,]
       training_label <- y[-idx]
-      
-      if (is.function(fs_callback)) {
-        fs <- fs_callback(xtrain=training_data, ytrain=training_label, opts$fs)
-        training_data <- fs$xtrain
-        training_label <- fs$ytrain
-      }
     } else {
       # if we have only one fold, that means that we
       # want to build the model using the whole dataset;
@@ -60,14 +55,25 @@ cv <- function(x, y, nfolds=10, folds=NULL, model_callback, predict_callback, fs
       training_label <- testing_label
     }
     
-    model <- model_callback(xtrain=training_data, ytrain=training_label, opts$model)
-    pred <- predict_callback(model, xtest=testing_data, ytest=testing_label, opts$predict)
+    if (is.function(fs_callback)) {
+      fs <- fs_callback(xtrain = training_data, ytrain = training_label, opts$fs)
+      training_data <- training_data[, selected_features_names]
+      testing_data <- testing_data[, selected_features_names]
+    }
     
-    list(
+    model <- model_callback(xtrain = training_data, ytrain = training_label, opts$model)
+    pred <- predict_callback(model, xtest = testing_data, ytest = testing_label, opts$predict)
+    
+    ret <- list(
       idx = idx,
       model = model,
       pred = pred
     )
+    if (is.function(fs_callback)) {
+      ret$fs <- fs
+    }
+    
+    ret
   }, mc.cores=ncores)
   
   cvs
