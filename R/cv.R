@@ -57,8 +57,8 @@ cv <- function(x, y, nfolds=10, folds=NULL, model_callback, predict_callback, fs
     
     if (is.function(fs_callback)) {
       fs <- fs_callback(xtrain = training_data, ytrain = training_label, opts$fs)
-      training_data <- training_data[, selected_features_names]
-      testing_data <- testing_data[, selected_features_names]
+      training_data <- training_data[, fs$selected_features_names]
+      testing_data <- testing_data[, fs$selected_features_names]
     }
     
     model <- model_callback(xtrain = training_data, ytrain = training_label, opts$model)

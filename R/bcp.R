@@ -34,12 +34,19 @@ bcp <- function(x, y, folds=NULL, nfolds=10, panel, save_models=TRUE, ncores=1) 
     predictions <- as.vector(unlist(sapply(classif, function(x) x[["pred"]]@predictions[[1]])))
     truth <- as.vector(unlist(sapply(classif, function(x) x[["pred"]]@labels[[1]])))
     
+    if (is.function(p$fs_callback)) {
+      fs <- lapply(classif, function(x) x[["fs"]])
+    } else {
+      fs <- NULL
+    }
+    
     ret <- list(
       idx = idx,
       label = name,
       preds = preds,
       predictions = predictions,
-      truth = truth
+      truth = truth,
+      fs = fs
     )
     if (isTRUE(save_models)) {
       ret$models <- models
