@@ -5,7 +5,7 @@
 #' @param nfolds if 'k.cv' is not null, then 'nfolds' is not used
 #'
 #' @export bcp
-bcp <- function(x, y, folds=NULL, nfolds=10, panel, save_models=TRUE, ncores=1) {
+bcp <- function(x, y, folds=NULL, nfolds=10, panel, save_models=TRUE, ncores=1, debug=FALSE) {
   if (is.null(folds)) {
     if (!require("caret"))
       stop("bcp function requires 'caret' package to create folds")
@@ -16,6 +16,9 @@ bcp <- function(x, y, folds=NULL, nfolds=10, panel, save_models=TRUE, ncores=1) 
   
   classifiers <- lapply(seq_along(panel), function(i) {
     name <- names(panel)[i]
+    if (debug) {
+      message(name)
+    }
     p <- panel[[i]]
     
     classif <- cv(
