@@ -24,6 +24,13 @@ scale_this <- function(x, method="scale") {
   ret
 }
 
+#' Combining do.call and lapply functions in one
+#' 
+#' @export
+dolapply <- function(x, what, ...) {
+  do.call(what, lapply(x, ...))
+}
+
 check_if_loaded <- function(package, stop_message = NULL) {
   loaded <- package %in% (.packages())
   
